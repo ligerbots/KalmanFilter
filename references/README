@@ -1,0 +1,10 @@
+References for Kalman Filtering for Robots
+
+motor_characterization.pdf
+  - Noah Gleason and Eli Barnett's motor characterization whitepaper
+  - https://www.chiefdelphi.com/media/papers/3402
+
+2wheel_odometry.pdf
+  - http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.486.4728&rep=rep1&type=pdf
+  - Lindsay KLEEMAN, Monash Univ.
+  - complicated math to compute position covariance matrices based on wheel encoder changes
