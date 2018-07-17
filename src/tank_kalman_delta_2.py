@@ -35,7 +35,7 @@ class TankControlModel(object):
 
     def linear_acceleration(self, motor, curr_vel):
         max_v = self.max_velocity_from_motor(motor)
-        return self.acceleration_fraction * (max_v - curr_vel)
+        return self.accel_factor * (max_v - curr_vel)
 
     def omega_acceleration(self, motor_l, motor_r, curr_omega):
         max_o = self.max_omega_from_motor(motor_l, motor_r)
@@ -182,32 +182,40 @@ class TankKalmanDelta2(UnscentedKalmanFilter):
         c_t = math.cos(theta)
         s_t = math.sin(theta)
 
-        d_s = dt * x[TankKalmanDelta2.STATE_VS]
-        d_p = dt * x[TankKalmanDelta2.STATE_VP]
-        d_theta = dt * x[TankKalmanDelta2.STATE_OMEGA]
+        x_new = np.copy(x)
+
+        # v_s = x_new[TankKalmanDelta2.STATE_VS]
+        # omega = x_new[TankKalmanDelta2.STATE_OMEGA]
+        if accelerations is not None:
+            # for the current step, use the average velocities
+            # ** NOPE: worse!
+            # v_s += 0.5 * dt * accelerations[0]
+            # omega += 0.5 * dt * accelerations[1]
+            x_new[TankKalmanDelta2.STATE_VS] += dt * accelerations[0]
+            x_new[TankKalmanDelta2.STATE_OMEGA] += dt * accelerations[1]
+
+        d_s = dt * x_new[TankKalmanDelta2.STATE_VS]
+        d_p = dt * x_new[TankKalmanDelta2.STATE_VP]
+        d_theta = dt * x_new[TankKalmanDelta2.STATE_OMEGA]
 
         if abs(d_theta) < 0.001:
             # straight line motion
-            dx = np.array([d_s*c_t - d_p*s_t, d_s*s_t + d_p*c_t, 0, 0, 0, 0])
+            d_x = d_s*c_t - d_p*s_t
+            d_y = d_s*s_t + d_p*c_t
         else:
             # turning, circular motion
             r = d_s / d_theta
 
             s_t_dt = math.sin(theta + d_theta)
             c_t_dt = math.cos(theta + d_theta)
-            dx = np.array([r*(s_t_dt - s_t) - d_p*(s_t + s_t_dt)/2.0,
-                           r*(c_t - c_t_dt) + d_p*(c_t + c_t_dt)/2.0,
-                           0, 0, d_theta, 0])
+            d_x = r*(s_t_dt - s_t) - d_p*(s_t + s_t_dt)/2.0
+            d_y = r*(c_t - c_t_dt) + d_p*(c_t + c_t_dt)/2.0
 
-        new_x = x + dx
+        x_new[TankKalmanDelta2.STATE_X] += d_x
+        x_new[TankKalmanDelta2.STATE_Y] += d_y
+        x_new[TankKalmanDelta2.STATE_THETA] += d_theta
 
-        if accelerations is not None:
-            dx = np.zeros((TankKalmanDelta2.STATE_LEN,))
-            dx[TankKalmanDelta2.STATE_V_S] = dt * accelerations[0]
-            dx[TankKalmanDelta2.STATE_OMEGA] = dt * accelerations[1]
-            new_x += dx
-
-        return new_x
+        return x_new
 
     @staticmethod
     def x_residual_fn(a, b):
