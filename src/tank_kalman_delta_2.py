@@ -100,18 +100,21 @@ class TankKalmanDelta2(UnscentedKalmanFilter):
 
         return
 
-    def predict(self, dt, motors=None):
+    def predict(self, dt, motors=None, nsteps=1):
         # save the previous state for use during update()
         self.prev_x = np.copy(self.x)
 
-        # set Q and predict
-        self.Q = self.Q_func(dt, self.x[self.STATE_THETA])
+        dt_step = dt / nsteps
+        for _ in range(nsteps):
+            # set Q and predict
+            self.Q = self.Q_func(dt_step, self.x[self.STATE_THETA])
 
-        accelerations = None
-        if motors:
-            accelerations = self.control_model.accelerations(motors, self.x[self.STATE_VS], self.x[self.STATE_OMEGA])
+            accelerations = None
+            if motors and self.control_model:
+                accelerations = self.control_model.accelerations(motors, self.x[self.STATE_VS], self.x[self.STATE_OMEGA])
 
-        return UnscentedKalmanFilter.predict(self, accelerations=accelerations)
+            UnscentedKalmanFilter.predict(self, dt=dt_step, accelerations=accelerations)
+        return
 
     def update(self, enc_l, enc_r, yaw):
         # Compute position from encoders, use yaw
